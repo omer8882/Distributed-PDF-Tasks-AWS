@@ -13,3 +13,4 @@ buildNumber.properties
 .idea/$PRODUCT_WORKSPACE_FILE$
 .idea/misc.xml
 .idea/workspace.xml
+.idea/vcs.xml
