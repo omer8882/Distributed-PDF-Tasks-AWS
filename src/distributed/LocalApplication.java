@@ -1,9 +1,13 @@
 package distributed;
 
 public class LocalApplication {
-    public static void run(String path, boolean terminateMode){
+    private static SQSManager sqs;
+    public static void run(String path, boolean terminateMode, int n){
+        String sqsIdentifier = "SQSIdentifier";
+        String s3Identifier = "S3Identifier";
+        sqs = new SQSManager(sqsIdentifier);
         System.out.println("Local application is running!");
-        activateManager();
+        activateManager(sqsIdentifier, s3Identifier, n);
         uploadFileToS3(path);
         sendSQSMessage("input file : " + path);
         String resultPath = getResultPath();
@@ -27,37 +31,29 @@ public class LocalApplication {
     }
 
     private static String getResultPath() {
-        String resultPathS3 = "";
-        do {
-            resultPathS3 = tryReadFromSQS();
-        }
-        while (resultPathS3 == "");
-        return resultPathS3;
-    }
-
-    private static String tryReadFromSQS() {
-        return "pathToResultFileS3";
+        return sqs.readBlocking();
     }
 
     private static void sendSQSMessage(String str) {
-        System.out.println("sending SQS message : " + str);
+        sqs.write(str);
     }
 
     private static void uploadFileToS3(String path) {
         System.out.println("Uploading "+path+" to s3");
     }
 
-    private static void activateManager() {
+    private static void activateManager(String sqsIdentifier, String s3Identifier, int n) {
         if (!managerIsActive()){
-            startManager();
+            startManager(sqsIdentifier, s3Identifier, n);
         }
     }
 
-    private static void startManager() {
+    private static void startManager(String sqsIdentifier,String s3Identifier, int n) {
         System.out.println("Staring manager!");
+        Manager manager = new Manager(sqsIdentifier, s3Identifier, n);
     }
 
     private static boolean managerIsActive() {
-        return true;
+        return false;
     }
 }
