@@ -1,63 +1,89 @@
+import software.amazon.awssdk.services.sqs.model.Message;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+
 public class LocalApplication {
-    private static SQSManager sqs;
+    private Sqs inputSqs;
+    private Sqs resultSqs;
     private Manager manager;
-    public void run(String path, boolean terminateMode, int n){
+    private S3 s3;
+
+    public void run(String inputFilePath, int n, boolean terminateMode){
         System.out.println("Local application is running!");
 
-        String sqsIdentifier = "LocalAppQueue" + System.currentTimeMillis() + ".fifo";
+        String resultSqsId = "LocalAppResultSqs" + System.currentTimeMillis() + ".fifo";
+        String s3Id = "S3Id" + System.currentTimeMillis();
 
-        String s3Identifier = "S3Identifier";
-        sqs = new SQSManager(sqsIdentifier);
+        resultSqs = new Sqs(resultSqsId);
+        s3 = new S3(s3Id);
 
-        activateManager(sqs, s3Identifier, n);
-        uploadFileToS3(path);
-        sendSQSMessage("input file : " + path);
-        String resultPath = getResultPath();
-        createResultFile(resultPath);
+        activateManager(s3Id, n);
+        uploadFileToS3(inputFilePath);
+        inputSqs.write("inputFile: " + inputFilePath + " " + resultSqsId, "inputFiles");
+        Message resultMessage = getResultPath();
+        createResultFile(resultMessage.body());
         handleMode(terminateMode);
-        //sqs.delete();
+        resultSqs.delete();
+        inputSqs.delete(); // todo remove that !
     }
 
-    private static void handleMode(boolean terminateMode) {
+    private void handleMode(boolean terminateMode) {
         if(terminateMode){
             sendTerminationToManager();
         }
     }
 
-    private static void sendTerminationToManager() {
+    private void sendTerminationToManager() {
         System.out.println("Terminating the manager");
+        inputSqs.write("terminate", "terminations");
     }
 
-    private static void createResultFile(String resultPath) {
+    private void createResultFile(String resultPath) {
+        System.out.println("Preparing HTML file.");
         System.out.println("Downloading the results from s3 at: " + resultPath);
-        System.out.println("Creating HTML representing the results");
-    }
-
-    private static String getResultPath() {
-        return sqs.readBlocking();
-    }
-
-    private static void sendSQSMessage(String str) {
-        sqs.write(str);
-    }
-
-    private static void uploadFileToS3(String path) {
-        System.out.println("Uploading "+path+" to s3");
-    }
-
-    private void activateManager(SQSManager sqs, String s3Identifier, int n) {
-        if (!managerIsActive()){
-            startManager(sqs, s3Identifier, n);
+        BufferedReader resultFileBuffer = s3.download(resultPath);
+        try{
+            String line;
+            while ((line = resultFileBuffer.readLine()) != null) {
+                System.out.println(line);
+                // niv
+                // TODO: Add each line to the HTML summary file.
+            }
+        }catch(IOException e){
+            System.out.println(e);
         }
     }
 
-    private void startManager(SQSManager sqs,String s3Identifier, int n) {
-        System.out.println("Staring manager!");
-        this.manager = new Manager(sqs, s3Identifier, n);
-        manager.run();
+    private Message getResultPath() {
+        return resultSqs.readBlocking();
     }
 
-    private static boolean managerIsActive() {
+    private void uploadFileToS3(String path) {
+        System.out.println("Uploading "+path+" to s3");
+    }
+
+    private void activateManager(String s3Identifier, int n) {
+        String inputSqsPrefix = "LocalAppInputSqs";
+        if (!managerIsActive()){
+            String inputSqsIdentifier = inputSqsPrefix  + System.currentTimeMillis() + ".fifo";
+            startManager(inputSqsIdentifier, s3Identifier, n);
+            new Thread(()->manager.run()).start();
+        }
+        inputSqs = new Sqs(inputSqsPrefix);
+
+    }
+
+    private void startManager(String sqsIdentifier,String s3Identifier, int n) {
+        System.out.println("Staring manager!");
+        this.manager = new Manager(sqsIdentifier, s3Identifier, n);
+    }
+
+    private boolean managerIsActive() {
+        //TODO
         return false;
     }
+    //TODO
+    //this class should not hold a manager as field, in addition the check if manager is active should check
+    // ec2 instance with that name.
 }
