@@ -35,7 +35,7 @@ public class PDFConverter {
         PDFRenderer pdfRenderer = new PDFRenderer(document);
         int page = 0; //What page to render (only one at a time)
         BufferedImage bim = pdfRenderer.renderImageWithDPI(page, 300, ImageType.RGB);
-        String output = pdfAbsolutePath.substring(0, pdfAbsolutePath.length()-3)+".png";
+        String output = pdfAbsolutePath.substring(0, pdfAbsolutePath.length()-3)+"png";
         ImageIOUtil.writeImage(bim, output, 300);
         document.close();
         System.out.println("Converted PDF to PNG file.");
