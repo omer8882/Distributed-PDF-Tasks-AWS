@@ -4,14 +4,16 @@ import software.amazon.awssdk.services.ec2.model.*;
 import software.amazon.awssdk.services.sqs.model.Message;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
 public class Manager {
     Sqs localAppInputSqs;
-    S3 s3Manager;
+    S3 s3;
     Sqs workersSQS;
     Ec2Client ec2Client;
     int currentNumOfWorkers;
@@ -22,7 +24,7 @@ public class Manager {
     //should be singleton
     public Manager(String localAppSqsId, String s3Identifier, int n) {
         this.localAppInputSqs = new Sqs(localAppSqsId);
-        this.s3Manager = new S3(s3Identifier);
+        this.s3 = new S3(s3Identifier);
         String workerSqsId = "workerSqs" + System.currentTimeMillis() + ".fifo";
         this.workersSQS = new Sqs(workerSqsId);
         this.n = n;
@@ -72,8 +74,9 @@ public class Manager {
 
     private void handleTask(Message msg, Object lock) {
         String[] splited = msg.body().split("\\s+"); // [0] InputFile: , [1] path, [2] result sqs
-        BufferedReader s3Content = s3Manager.download(splited[1]);
-        Sqs workerResultsSqs = new Sqs(splited[2]);
+        BufferedReader s3Content = s3.download(splited[1]);
+        String workerResultsSqsId = "workerResultsSqsId" + System.currentTimeMillis(); // maybe splited[2]
+        Sqs workerResultsSqs = new Sqs(workerResultsSqsId);
         int workerItemsCount = 0;
         try {
             String line;
@@ -85,7 +88,8 @@ public class Manager {
                 if (operation == 0)
                     throw new IOException("Operation on message is illegal!\n Got: " + operationString);
                 ObjectMapper mapper = new ObjectMapper();
-                String msgString = mapper.writeValueAsString(new WorkerRequestMsg(operation, "http://www.website.com/file.pdf", splited[2]));
+                String msgString = mapper.writeValueAsString(
+                    new WorkerRequestMsg(operation, "http://www.website.com/file.pdf", workerResultsSqsId)); //maybe splited[2]
                 workersSQS.write(msgString, "thinkAboutThat");
                 workerItemsCount++;
             }
@@ -105,12 +109,17 @@ public class Manager {
             // aggregate result
             resultString += getWorkerCompleteMessage(workerResultMsg.body()) + "\n";
         }
-        //TODO
-        //niv
-//        upload result to s3
-//        write the path to the results to local app sqs
-        Sqs resultSqs = new Sqs(splited[2]); // need to trim the message
-        resultSqs.write("result bla bla", "results");
+        String fileName = "result.txt";
+        try (PrintWriter out = new PrintWriter(fileName)) {
+            out.println(resultString);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        //        upload result to s3
+        String url = s3.upload(fileName);
+        //      write the path to the results to local app sqs
+        Sqs localAppResultSqs = new Sqs(splited[2]); // need to trim the message
+        localAppResultSqs.write(url, "results");
     }
 
     private void createWorkers(Object lock) {

@@ -20,8 +20,8 @@ public class LocalApplication {
         ec2Client = Ec2Client.builder().build();
 
         String resultSqsId = "LocalAppResultSqs" + System.currentTimeMillis() + ".fifo";
-        String s3Id = "S3Id" + System.currentTimeMillis();
-
+        // String s3Id = "S3Id" + System.currentTimeMillis();
+        String s3Id = "mybucket920463236";
         resultSqs = new Sqs(resultSqsId);
         s3 = new S3(s3Id);
 
@@ -68,10 +68,11 @@ public class LocalApplication {
 
     private void uploadFileToS3(String path) {
         System.out.println("Uploading " + path + " to s3");
+       s3.upload(path);
     }
 
     private void activateManager(String s3Identifier, int n) {
-        String inputSqsPrefix = "LocalAppInputSqs";
+        String inputSqsPrefix = "LocalAppInputSqs.fifo";
         Instance managerInstance = getManager(); // TODO: Edge Case: Return array of Managers
         if (managerInstance == null || managerInstance.state().name() == InstanceStateName.TERMINATED || managerInstance.state().name() == InstanceStateName.STOPPING || managerInstance.state().name() == InstanceStateName.STOPPED) {
             String inputSqsIdentifier = inputSqsPrefix + System.currentTimeMillis() + ".fifo";
