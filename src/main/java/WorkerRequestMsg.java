@@ -8,6 +8,11 @@ public class WorkerRequestMsg {
         this.fileURL = fileURL;
         this.resultSqsId = resultSqsId;
     }
+    public WorkerRequestMsg() {
+        this.operation = 0;
+        this.fileURL = "";
+        this.resultSqsId = "";
+    }
 
     public short getOperation() { return operation; }
 

@@ -84,11 +84,12 @@ public class Sqs {
                 .build());
     }
 
-    private Message tryReadFromSQS() {
+    public Message tryReadFromSQS() {
         try {
             ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
                     .queueUrl(queueURL)
                     .maxNumberOfMessages(1)
+                    .visibilityTimeout(60)
                     .build();
             List<Message> messages = sqsClient.receiveMessage(receiveMessageRequest).messages();
             if (messages == null || messages.size() == 0) {

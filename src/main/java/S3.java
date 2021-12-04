@@ -21,9 +21,9 @@ public class S3 {
 
     public BufferedReader download(String URL) {
         String bucketName = identifier;
-        String[] URLsplit = URL.split("/");
-        String fileKey = URLsplit[3];
-        bucketName = URLsplit[2];
+        String[] URLsplit = URL.split("//");
+        String fileKey = URLsplit[2];
+        bucketName = URLsplit[1];
         System.out.println("Downloading a file on S3 from: " + URL);
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucketName)
@@ -36,7 +36,7 @@ public class S3 {
 
     public String upload(String path){
         String bucketName = identifier;
-        String key = path.substring(path.lastIndexOf('\\'));
+        String key = path.substring(path.lastIndexOf('/'));
         int keyPtIdx = key.lastIndexOf('.');
         key = key.substring(0, keyPtIdx)+ "-" + System.currentTimeMillis() + key.substring(keyPtIdx);
         PutObjectRequest objectRequest = PutObjectRequest.builder()

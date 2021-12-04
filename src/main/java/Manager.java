@@ -10,6 +10,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class Manager {
     Sqs localAppInputSqs;
@@ -25,7 +26,8 @@ public class Manager {
     public Manager(String localAppSqsId, String s3Identifier, int n) {
         this.localAppInputSqs = new Sqs(localAppSqsId);
         this.s3 = new S3(s3Identifier);
-        String workerSqsId = "workerSqs" + System.currentTimeMillis() + ".fifo";
+//        String workerSqsId = "workerSqs" + System.currentTimeMillis() + ".fifo"; // todo return to that
+        String workerSqsId = "workerSqs1638641462773.fifo";
         this.workersSQS = new Sqs(workerSqsId);
         this.n = n;
         this.terminateReceived = false;
@@ -40,9 +42,15 @@ public class Manager {
         Message msg;
         int i = 0;
         while (!terminateReceived) {
-            msg = localAppInputSqs.readBlocking();
-            localAppInputSqs.deleteMessage(msg);
-            if (msg.body().startsWith("inputFile: ")) {
+            msg = localAppInputSqs.tryReadFromSQS();
+//            localAppInputSqs.deleteMessage(msg); // todo relocate
+            if (msg == null) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            } else if (msg.body().startsWith("inputFile: ")) {
                 Message finalMsg = msg;
                 Thread t = new Thread("" + i) {
                     public void run() {
@@ -75,13 +83,17 @@ public class Manager {
     private void handleTask(Message msg, Object lock) {
         String[] splited = msg.body().split("\\s+"); // [0] InputFile: , [1] path, [2] result sqs
         BufferedReader s3Content = s3.download(splited[1]);
-        String workerResultsSqsId = "workerResultsSqsId" + System.currentTimeMillis(); // maybe splited[2]
+//        String workerResultsSqsId = "workerResultsSqsId" + System.currentTimeMillis() + ".fifo"; todo return to that
+        String workerResultsSqsId = "workerResultsSqsId1638641378059.fifo";
         Sqs workerResultsSqs = new Sqs(workerResultsSqsId);
         int workerItemsCount = 0;
+
         try {
             String line;
             while ((line = s3Content.readLine()) != null) {
-                String operationString = line.substring(0, line.indexOf(' '));
+                System.out.println(line);
+                String operationString = line.substring(0, line.indexOf('\t'));
+                String fileURL = line.substring(line.indexOf('\t')+1);
                 short operation = operationString.equals("ToImage") ? PDFConverter.ToImage :
                         operationString.equals("ToHTML") ? PDFConverter.ToHTML :
                                 operationString.equals("ToText") ? PDFConverter.ToText : 0;
@@ -89,7 +101,7 @@ public class Manager {
                     throw new IOException("Operation on message is illegal!\n Got: " + operationString);
                 ObjectMapper mapper = new ObjectMapper();
                 String msgString = mapper.writeValueAsString(
-                    new WorkerRequestMsg(operation, "http://www.website.com/file.pdf", workerResultsSqsId)); //maybe splited[2]
+                        new WorkerRequestMsg(operation, fileURL, workerResultsSqsId));
                 workersSQS.write(msgString, "thinkAboutThat");
                 workerItemsCount++;
             }
@@ -120,6 +132,7 @@ public class Manager {
         //      write the path to the results to local app sqs
         Sqs localAppResultSqs = new Sqs(splited[2]); // need to trim the message
         localAppResultSqs.write(url, "results");
+        localAppInputSqs.deleteMessage(msg); // relocated
     }
 
     private void createWorkers(Object lock) {
@@ -131,7 +144,7 @@ public class Manager {
         int assertRunning = getNumOfRunningWorkers();
         if (assertRunning < currentNumOfWorkers) {
             System.out.println("Warning: Manager and AWS show different running workers. A worker error must've occurred.");
-            currentNumOfWorkers=assertRunning;
+            currentNumOfWorkers = assertRunning;
         }
         for (int i = currentNumOfWorkers; i < tmp; i++) {
             createNewWorker(i);
@@ -145,11 +158,11 @@ public class Manager {
         Filter filter = Filter.builder().name("tag:Type").values("Worker").build();
         DescribeInstancesRequest request = DescribeInstancesRequest.builder().filters(filter).build();
         DescribeInstancesResponse response = ec2Client.describeInstances(request);
-        int count=0, running=0;
+        int count = 0, running = 0;
         for (Reservation reservation : response.reservations()) {
             for (Instance instance : reservation.instances()) {
-                System.out.println("Worker "+(++count)+" is " + instance.state().name());
-                if (instance.state().name()==InstanceStateName.RUNNING || instance.state().name()==InstanceStateName.PENDING)
+                System.out.println("Worker " + (++count) + " is " + instance.state().name());
+                if (instance.state().name() == InstanceStateName.RUNNING || instance.state().name() == InstanceStateName.PENDING)
                     running++;
             }
         }
@@ -162,16 +175,16 @@ public class Manager {
         startInstance(instanceId);
     }
 
-    private String createWorkerInstance(){
+    private String createWorkerInstance() {
         String amiID = "ami-04902260ca3d33422"; // amazon linux(T2_MICRO) without java
         String userDataString = "#!/bin/bash\n" +
                 "set -x\n" + "echo Hello, World!1\n" +
                 "sudo amazon-linux-extras install java-openjdk11\n" +
-                "export AWS_ACCESS_KEY_ID=ASIAQYDTG66XIRC7SQDD\n" +
-                "export AWS_SECRET_ACCESS_KEY=NlmZgI9B9/+T1r4LS0qfNokg6HpQtNjI721czPxA\n" +
-                "export AWS_SESSION_TOKEN=FwoGZXIvYXdzEFAaDH5DenXY9kOZOL+MEyLIAYTe2peYn0EgVKedKuhPXZFN3LYPlEn4ap5mKG7aAnJ8PhJmP8gjuqZfWXCHiNUkeGfnvnHNPOoqjkGsn/rHSBDm7o3RX05F3+IzB35xgeo9bzJdAWuWU2Iba2mnUkz9dhaTJ3QWU2buvQKmhG//YtztoWwjR+bbMDqMmQypgQcUsU7wkUwg1T+/xRqUZXNNC+ZuE2VuAd0uuueWEnylCIwDAn5gxK3+XJZ9cHjWpiTM6I0d+Jwus9ZzXP6hc+fA4FmODHgQVV+MKNuUno0GMi1H3MuLFD9X9yyhak2KMIPIqCSdxDFuIyRfJ/pJCHCXn1+mvf62uLfb2cVc9dE=\n" +
+                "export AWS_ACCESS_KEY_ID=ASIAT5QD65XO7ZOCSGBK\n" +
+                "export AWS_SECRET_ACCESS_KEY=gPZysNQTEq59SGwqnPJ8p2jzt6rmi4RLjuEI+M4V\n" +
+                "export AWS_SESSION_TOKEN=FwoGZXIvYXdzEJr//////////wEaDMzmCjoa417GPoTfriLGAad6Npn1x+T6gnKe51Dw5XXbU4m3e/WoTL3l/RhJOtW8I2l7KeMSKPK6fhh6RFXrJs2qesCJf/BR1tC+1hgiioPKyqx7hRWzp/TDXMuMURHG3Vt6fRMt18muGgGHmHXeAqaDSDjD6gtET+OQmvQUP3ivlrlvy9cem0S5OjtXTj514231VKrEkl3lsIbLCRqJ/bDyiDzBIa0dKFHlm8JE4AcEFgTqiPp7Gg7QCKLv47sCf3cP4tfIUCybegBQ1gKzlso5MKpX4yjYt66NBjItm/Iq+kI9z7h2KASEm9qi9JxL2XEVPcjLl2vFjGAOqXAPPCiec+0fYVYmWqc5\n" +
                 "export AWS_DEFAULT_REGION=us-east-1\n" +
-                "aws s3 cp s3://bucket1637048833333/Main.jar Main.jar\n" +
+                "aws s3 cp s3://mybucket920463236/Main.jar Main.jar\n" +
                 "java -jar Main.jar";
         String userData = Base64.getEncoder().encodeToString((userDataString).getBytes());
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
@@ -228,14 +241,14 @@ public class Manager {
         List<String> workers = new ArrayList<>();
         for (Reservation reservation : response.reservations()) {
             for (Instance instance : reservation.instances()) {
-                if (instance.state().name()!=InstanceStateName.TERMINATED){
+                if (instance.state().name() != InstanceStateName.TERMINATED) {
                     workers.add(instance.instanceId());
                 }
             }
         }
 
         // Termination
-        try{
+        try {
             TerminateInstancesRequest ti = TerminateInstancesRequest.builder()
                     .instanceIds(workers)
                     .build();
@@ -243,7 +256,7 @@ public class Manager {
             List<InstanceStateChange> list = responseTer.terminatingInstances();
             for (int i = 0; i < list.size(); i++) {
                 InstanceStateChange sc = (list.get(i));
-                System.out.println("Terminated Worker Instance "+sc.instanceId());
+                System.out.println("Terminated Worker Instance " + sc.instanceId());
             }
         } catch (Ec2Exception e) {
             System.err.println(e.awsErrorDetails().errorMessage());

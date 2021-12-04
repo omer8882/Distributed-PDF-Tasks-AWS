@@ -19,15 +19,20 @@ public class LocalApplication {
         System.out.println("Local application is running!");
         ec2Client = Ec2Client.builder().build();
 
-        String resultSqsId = "LocalAppResultSqs" + System.currentTimeMillis() + ".fifo";
+//        String resultSqsId = "LocalAppResultSqs" + System.currentTimeMillis() + ".fifo"; todo return to that
+        String resultSqsId = "LocalAppResultSqs1638641369719.fifo";
         // String s3Id = "S3Id" + System.currentTimeMillis();
         String s3Id = "mybucket920463236";
         resultSqs = new Sqs(resultSqsId);
         s3 = new S3(s3Id);
-
-        activateManager(s3Id, n);
-        uploadFileToS3(inputFilePath);
-        inputSqs.write("inputFile: " + inputFilePath + " " + resultSqsId, "inputFiles");
+//todo 
+        String inputSqsIdentifier = "LocalAppInputSqs1638641371711.fifo"; //remove
+        
+        inputSqs = new Sqs(inputSqsIdentifier); //remove
+        String s3Path = uploadFileToS3(inputFilePath); // 2
+        inputSqs.write("inputFile: " + s3Path + " " + resultSqsId, "inputFiles"); // 3
+        manager = new Manager(inputSqsIdentifier, s3Id, n);  // remove
+        activateManager(s3Id, n); //1
         Message resultMessage = getResultPath();
         createResultFile(resultMessage.body());
         handleMode(terminateMode);
@@ -66,21 +71,24 @@ public class LocalApplication {
         return resultSqs.readBlocking();
     }
 
-    private void uploadFileToS3(String path) {
+    private String uploadFileToS3(String path) {
         System.out.println("Uploading " + path + " to s3");
-       s3.upload(path);
+        return s3.upload(path); //todo need to uncomment that once path is real
     }
 
     private void activateManager(String s3Identifier, int n) {
-        String inputSqsPrefix = "LocalAppInputSqs.fifo";
-        Instance managerInstance = getManager(); // TODO: Edge Case: Return array of Managers
-        if (managerInstance == null || managerInstance.state().name() == InstanceStateName.TERMINATED || managerInstance.state().name() == InstanceStateName.STOPPING || managerInstance.state().name() == InstanceStateName.STOPPED) {
-            String inputSqsIdentifier = inputSqsPrefix + System.currentTimeMillis() + ".fifo";
-            String managerInstanceId = createManager(inputSqsIdentifier, s3Identifier, n);
-            startManager(managerInstanceId);
-            //new Thread(() -> manager.run()).start();
-        }
-        inputSqs = new Sqs(inputSqsPrefix);
+        //todo uncomment this code
+//        String inputSqsPrefix = "LocalAppInputSqs.fifo"; //todo I think we should remove .fifo from here
+//        Instance managerInstance = getManager(); // TODO: Edge Case: Return array of Managers
+//        if (managerInstance == null || managerInstance.state().name() == InstanceStateName.TERMINATED || managerInstance.state().name() == InstanceStateName.STOPPING || managerInstance.state().name() == InstanceStateName.STOPPED) {
+//            todo if we want to hard code the sqs id do it here
+//            String inputSqsIdentifier = inputSqsPrefix + System.currentTimeMillis() + ".fifo";
+//            String managerInstanceId = createManager(inputSqsIdentifier, s3Identifier, n);
+//            startManager(managerInstanceId);
+//            //new Thread(() -> manager.run()).start();
+//        }
+//        inputSqs = new Sqs(inputSqsPrefix);
+        manager.run();
     }
 
     private String createManager(String sqsIdentifier, String s3Identifier, int n) {
@@ -89,9 +97,9 @@ public class LocalApplication {
         String userDataString = "#!/bin/bash\n" +
                 "set -x\n" + "echo Hello, World!1\n" +
                 "sudo amazon-linux-extras install java-openjdk11\n" +
-                "export AWS_ACCESS_KEY_ID=ASIAQYDTG66XIRC7SQDD\n" +
-                "export AWS_SECRET_ACCESS_KEY=NlmZgI9B9/+T1r4LS0qfNokg6HpQtNjI721czPxA\n" +
-                "export AWS_SESSION_TOKEN=FwoGZXIvYXdzEFAaDH5DenXY9kOZOL+MEyLIAYTe2peYn0EgVKedKuhPXZFN3LYPlEn4ap5mKG7aAnJ8PhJmP8gjuqZfWXCHiNUkeGfnvnHNPOoqjkGsn/rHSBDm7o3RX05F3+IzB35xgeo9bzJdAWuWU2Iba2mnUkz9dhaTJ3QWU2buvQKmhG//YtztoWwjR+bbMDqMmQypgQcUsU7wkUwg1T+/xRqUZXNNC+ZuE2VuAd0uuueWEnylCIwDAn5gxK3+XJZ9cHjWpiTM6I0d+Jwus9ZzXP6hc+fA4FmODHgQVV+MKNuUno0GMi1H3MuLFD9X9yyhak2KMIPIqCSdxDFuIyRfJ/pJCHCXn1+mvf62uLfb2cVc9dE=\n" +
+                "export AWS_ACCESS_KEY_ID=ASIAT5QD65XO7ZOCSGBK\n" +
+                "export AWS_SECRET_ACCESS_KEY=gPZysNQTEq59SGwqnPJ8p2jzt6rmi4RLjuEI+M4V\n" +
+                "export AWS_SESSION_TOKEN=FwoGZXIvYXdzEJr//////////wEaDMzmCjoa417GPoTfriLGAad6Npn1x+T6gnKe51Dw5XXbU4m3e/WoTL3l/RhJOtW8I2l7KeMSKPK6fhh6RFXrJs2qesCJf/BR1tC+1hgiioPKyqx7hRWzp/TDXMuMURHG3Vt6fRMt18muGgGHmHXeAqaDSDjD6gtET+OQmvQUP3ivlrlvy9cem0S5OjtXTj514231VKrEkl3lsIbLCRqJ/bDyiDzBIa0dKFHlm8JE4AcEFgTqiPp7Gg7QCKLv47sCf3cP4tfIUCybegBQ1gKzlso5MKpX4yjYt66NBjItm/Iq+kI9z7h2KASEm9qi9JxL2XEVPcjLl2vFjGAOqXAPPCiec+0fYVYmWqc5\n\n" +
                 "export AWS_DEFAULT_REGION=us-east-1\n" +
                 "aws s3 cp s3://"+s3Identifier+"/Main.jar Main.jar "+sqsIdentifier+"\n" +
                 "java -jar Main.jar";
