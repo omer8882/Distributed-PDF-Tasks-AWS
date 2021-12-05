@@ -122,17 +122,20 @@ public class Manager {
             resultString += getWorkerCompleteMessage(workerResultMsg.body()) + "\n";
         }
         String fileName = "result.txt";
+        String currentDirPath = System.getProperty("user.dir");
         try (PrintWriter out = new PrintWriter(fileName)) {
             out.println(resultString);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
         //        upload result to s3
-        String url = s3.upload(fileName);
+        String url = s3.upload(currentDirPath+"/"+fileName);
+
         //      write the path to the results to local app sqs
         Sqs localAppResultSqs = new Sqs(splited[2]); // need to trim the message
         localAppResultSqs.write(url, "");
         localAppInputSqs.deleteMessage(msg); // relocated
+        // todo delete the workerResultSqs
     }
 
     private void createWorkers(Object lock) {
@@ -273,7 +276,7 @@ public class Manager {
             String operation = msg.getOperation() == PDFConverter.ToImage ? "ToImage" :
                     msg.getOperation() == PDFConverter.ToHTML ? "ToHTML" :
                             msg.getOperation() == PDFConverter.ToText ? "ToText" : "ERROR";
-            summaryLine = msg.getFileURL() + " " + operation + " " + msg.getS3URL();
+            summaryLine = operation +" " +msg.getFileURL() + " " + msg.getS3URL();
         } catch (IOException e) {
             System.out.println("ERROR: Couldn't read workers complete message properly.\n" + e);
             summaryLine = "Error in transference of a message occurred.";

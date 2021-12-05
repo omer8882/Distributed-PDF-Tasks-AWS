@@ -9,6 +9,12 @@ public class WorkerCompleteMsg {
         this.s3URL = s3URL;
     }
 
+    public WorkerCompleteMsg() {
+        this.operation = 0;
+        this.fileURL = "";
+        this.s3URL = "";
+    }
+
     public short getOperation() { return operation; }
 
     public void setOperation(short operation) {

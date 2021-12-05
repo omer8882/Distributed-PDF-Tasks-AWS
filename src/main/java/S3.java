@@ -52,6 +52,6 @@ public class S3 {
         }catch(IOException e){
             System.out.println(e);
         }
-        return "s://"+identifier+"/"+key;
+        return "s3://"+identifier+"/"+key;
     }
 }
