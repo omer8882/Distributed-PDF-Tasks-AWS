@@ -13,7 +13,6 @@ public class Sqs {
 
     public Sqs(String identifier) {
         Region region = Region.US_EAST_1;
-        Ec2Client  ec2Client = Ec2Client.builder().region(region).build();
         this.sqsClient = SqsClient.builder().region(region).build();
 
         String prefix = identifier;
@@ -76,10 +75,13 @@ public class Sqs {
 
     public void write(String msg, String groupId) {
         System.out.println("Writing to sqs: " + msg);
+        if (groupId == ""){
+            groupId = String.valueOf(System.currentTimeMillis());
+        }
         sqsClient.sendMessage(SendMessageRequest.builder()
                 .queueUrl(queueURL)
                 .messageBody(msg)
-                .messageGroupId("ABC")
+                .messageGroupId(groupId)
                 .messageDeduplicationId(String.valueOf(System.currentTimeMillis()))
                 .build());
     }
@@ -89,7 +91,7 @@ public class Sqs {
             ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
                     .queueUrl(queueURL)
                     .maxNumberOfMessages(1)
-                    .visibilityTimeout(60)
+                    .visibilityTimeout(15*60)
                     .build();
             List<Message> messages = sqsClient.receiveMessage(receiveMessageRequest).messages();
             if (messages == null || messages.size() == 0) {

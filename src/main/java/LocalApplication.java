@@ -30,7 +30,7 @@ public class LocalApplication {
         
         inputSqs = new Sqs(inputSqsIdentifier); //remove
         String s3Path = uploadFileToS3(inputFilePath); // 2
-        inputSqs.write("inputFile: " + s3Path + " " + resultSqsId, "inputFiles"); // 3
+        inputSqs.write("inputFile: " + s3Path + " " + resultSqsId, ""); // 3
         manager = new Manager(inputSqsIdentifier, s3Id, n);  // remove
         activateManager(s3Id, n); //1
         Message resultMessage = getResultPath();
@@ -73,7 +73,7 @@ public class LocalApplication {
 
     private String uploadFileToS3(String path) {
         System.out.println("Uploading " + path + " to s3");
-        return s3.upload(path); //todo need to uncomment that once path is real
+        return s3.upload(path);
     }
 
     private void activateManager(String s3Identifier, int n) {

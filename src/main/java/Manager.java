@@ -102,7 +102,7 @@ public class Manager {
                 ObjectMapper mapper = new ObjectMapper();
                 String msgString = mapper.writeValueAsString(
                         new WorkerRequestMsg(operation, fileURL, workerResultsSqsId));
-                workersSQS.write(msgString, "thinkAboutThat");
+                workersSQS.write(msgString, "");
                 workerItemsCount++;
             }
         } catch (IOException e) {
@@ -131,7 +131,7 @@ public class Manager {
         String url = s3.upload(fileName);
         //      write the path to the results to local app sqs
         Sqs localAppResultSqs = new Sqs(splited[2]); // need to trim the message
-        localAppResultSqs.write(url, "results");
+        localAppResultSqs.write(url, "");
         localAppInputSqs.deleteMessage(msg); // relocated
     }
 

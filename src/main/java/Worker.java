@@ -80,7 +80,7 @@ public class Worker {
         try {
             String msgString = mapper.writeValueAsString(msgObject);
             Sqs resultSqs = new Sqs(request.getResultSqsId());
-            resultSqs.write(msgString, "blabla");
+            resultSqs.write(msgString, "");
             incomingSqs.deleteMessage(message);
             System.out.println("Complete message sent.");//todo delete the created files (download and converted)
         } catch (IOException e) {
