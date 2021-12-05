@@ -1,7 +1,9 @@
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.sqs.model.Message;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
@@ -20,35 +22,44 @@ public class Worker {
 
     public static void run() {
         while (true) {
+            String localPath="", outputPath="";
+            WorkerRequestMsg message = null;
+            Message msgObject = getMessage();
             try {
-                Message msgObject= getMessage();
-                WorkerRequestMsg message = convertMsg(msgObject);
-                String localPath = downloadPDF(message.getFileURL());
-                String outputPath = converter.convert(message.getOperation(), localPath);
+                message = convertMsg(msgObject);
+                if(message==null) throw new IOException("Message isn't formatted right");
+                localPath = downloadPDF(message.getFileURL());
+                outputPath = converter.convert(message.getOperation(), localPath);
                 String s3URL = s3.upload(outputPath);
-                sendSQSCompleteMessage(message, s3URL, msgObject);
+                sendSQSCompleteMessage(message, s3URL);
             } catch (IOException e) {
-                System.out.println("ERROR!\n" + e);
+                System.out.println("Error: Failed to complete task.\n"+e);
+                if(message == null) continue;
+                sendSQSFailedMessage(message);
+            } finally {
+                incomingSqs.deleteMessage(msgObject);
+                deleteLocalFiles(localPath, outputPath);
             }
         }
     }
 
-    private static WorkerRequestMsg convertMsg(Message message) throws IOException {
+    private static WorkerRequestMsg convertMsg(Message message) {
         ObjectMapper mapper = new ObjectMapper();
         WorkerRequestMsg msg = null;
         try {
             msg = mapper.readValue(message.body(), WorkerRequestMsg.class);
-        } catch (IOException e) {
-            System.out.println("ERROR: Couldn't read workers complete message properly.\n" + e);
+        } catch (JsonProcessingException e) {
+            System.out.println("Failed to convert message: "+e);
+            return null;
         }
         return msg;
     }
 
-    private static Message getMessage() throws IOException {
+    private static Message getMessage(){
         return incomingSqs.readBlocking();
     }
 
-    private static String downloadPDF(String url) {
+    private static String downloadPDF(String url) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder();
         String wgetCmdLine = "wget + " + url;
         String localPath = "";
@@ -57,34 +68,55 @@ public class Worker {
             processBuilder.command("cmd.exe", "/c", wgetCmdLine);
         } else {
             processBuilder.command("bash", "-c", wgetCmdLine);
-        } try {
-            Process process = processBuilder.start();//todo if cannot download return error to result sqs
-            //To read the output list
+        }
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
+            boolean downloaded=false;
             while ((line = reader.readLine()) != null) {
                 System.out.println(line);
+                if(line.startsWith("Downloaded: 1")) downloaded = true;
             }
-            int exitCode = process.waitFor();
-            System.out.println("\nCmd with exit code: " + exitCode);
             localPath = System.getProperty("user.dir") + url.substring(url.lastIndexOf('/'));
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
+            if(!downloaded) throw new IOException("Couldn't download PDF file. Aborting task.");
         return localPath;
     }
 
-    private static void sendSQSCompleteMessage(WorkerRequestMsg request, String s3URL, Message message) {
+    private static void sendSQSCompleteMessage(WorkerRequestMsg request, String s3URL) {
         WorkerCompleteMsg msgObject = new WorkerCompleteMsg(request.getOperation(), request.getFileURL(), s3URL);
         ObjectMapper mapper = new ObjectMapper();
         try {
             String msgString = mapper.writeValueAsString(msgObject);
             Sqs resultSqs = new Sqs(request.getResultSqsId());
             resultSqs.write(msgString, "blabla");
-            incomingSqs.deleteMessage(message);
-            System.out.println("Complete message sent.");//todo delete the created files (download and converted)
+            System.out.println("Complete message sent.");
         } catch (IOException e) {
             System.out.println(e);
+        }
+    }
+
+    private static void sendSQSFailedMessage(WorkerRequestMsg request) {
+        WorkerCompleteMsg msgObject = new WorkerCompleteMsg(request.getOperation(), request.getFileURL(), "ERROR: Couldn't Complete task.");
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            String msgString = mapper.writeValueAsString(msgObject);
+            Sqs resultSqs = new Sqs(request.getResultSqsId());
+            resultSqs.write(msgString, "");
+            System.out.println("Failure message sent.");
+        } catch (IOException e) {
+            System.out.println(e);
+        }
+    }
+
+    private static void deleteLocalFiles(String localPath, String outputPath) {
+        File f = new File(localPath);
+        if(f.delete()) {
+            System.out.println("Deleted local pdf file.");
+        }
+        f = new File(outputPath);
+        if(f.delete()) {
+            System.out.println("Deleted local converted file.");
         }
     }
 }

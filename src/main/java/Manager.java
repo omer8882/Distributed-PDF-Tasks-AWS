@@ -267,15 +267,17 @@ public class Manager {
     private String getWorkerCompleteMessage(String msgString) {
         ObjectMapper mapper = new ObjectMapper();
         WorkerCompleteMsg msg = null;
+        String summaryLine;
         try {
             msg = mapper.readValue(msgString, WorkerCompleteMsg.class);
+            String operation = msg.getOperation() == PDFConverter.ToImage ? "ToImage" :
+                    msg.getOperation() == PDFConverter.ToHTML ? "ToHTML" :
+                            msg.getOperation() == PDFConverter.ToText ? "ToText" : "ERROR";
+            summaryLine = msg.getFileURL() + " " + operation + " " + msg.getS3URL();
         } catch (IOException e) {
             System.out.println("ERROR: Couldn't read workers complete message properly.\n" + e);
+            summaryLine = "Error in transference of a message occurred.";
         }
-        String operation = msg.getOperation() == PDFConverter.ToImage ? "ToImage" :
-                msg.getOperation() == PDFConverter.ToHTML ? "ToHTML" :
-                        msg.getOperation() == PDFConverter.ToText ? "ToText" : "ERROR";
-        String summaryLine = msg.getFileURL() + " " + operation + " " + msg.getS3URL();
         return summaryLine;
     }
 }

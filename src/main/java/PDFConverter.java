@@ -19,7 +19,7 @@ public class PDFConverter {
         String outputPath = "";
         if (!path.toLowerCase().endsWith(".pdf")){
             System.out.println("Error: File is not PDF!");
-            return outputPath;
+            throw new IOException("File is not PDF.");
         }
         if ( (convertion & ToImage) == ToImage)
             outputPath = toImage(path);
