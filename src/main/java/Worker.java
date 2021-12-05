@@ -89,7 +89,7 @@ public class Worker {
         try {
             String msgString = mapper.writeValueAsString(msgObject);
             Sqs resultSqs = new Sqs(request.getResultSqsId());
-            resultSqs.write(msgString, "blabla");
+            resultSqs.write(msgString, "");
             System.out.println("Complete message sent.");
         } catch (IOException e) {
             System.out.println(e);
