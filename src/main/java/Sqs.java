@@ -75,7 +75,7 @@ public class Sqs {
 
     public void write(String msg, String groupId) {
         System.out.println("Writing to sqs: " + msg);
-        if (groupId == ""){
+        if (groupId == "") {
             groupId = String.valueOf(System.currentTimeMillis());
         }
         sqsClient.sendMessage(SendMessageRequest.builder()
@@ -91,7 +91,7 @@ public class Sqs {
             ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
                     .queueUrl(queueURL)
                     .maxNumberOfMessages(1)
-                    .visibilityTimeout(15*60)
+                    .visibilityTimeout(15 * 60)
                     .build();
             List<Message> messages = sqsClient.receiveMessage(receiveMessageRequest).messages();
             if (messages == null || messages.size() == 0) {
@@ -120,19 +120,19 @@ public class Sqs {
         }
     }
 
-        public void delete () {
-            try {
-                DeleteQueueRequest deleteQueueRequest = DeleteQueueRequest.builder()
-                        .queueUrl(queueURL)
-                        .build();
+    public void delete() {
+        try {
+            DeleteQueueRequest deleteQueueRequest = DeleteQueueRequest.builder()
+                    .queueUrl(queueURL)
+                    .build();
 
-                sqsClient.deleteQueue(deleteQueueRequest);
+            sqsClient.deleteQueue(deleteQueueRequest);
 
-            } catch (SqsException e) {
-                System.err.println(e.awsErrorDetails().errorMessage());
-                System.exit(1);
-            }
+        } catch (SqsException e) {
+            System.err.println(e.awsErrorDetails().errorMessage());
+            System.exit(1);
         }
+    }
 
 //        public int size () {
 //            try {
@@ -150,4 +150,4 @@ public class Sqs {
 //            }
 //            return -1;
 //        }
-    }
+}

@@ -9,6 +9,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.*;
+import java.nio.file.Files;
 
 public class S3 {
     private String identifier;
@@ -21,9 +22,9 @@ public class S3 {
 
     public BufferedReader download(String URL) {
         String bucketName = identifier;
-        String[] URLsplit = URL.split("//");
-        String fileKey = URLsplit[2];
-        bucketName = URLsplit[1];
+        String[] URLsplit = URL.split("/");
+        String fileKey = URLsplit[3];
+        bucketName = URLsplit[2];
         System.out.println("Downloading a file on S3 from: " + URL);
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucketName)
@@ -36,21 +37,26 @@ public class S3 {
 
     public String upload(String path){
         String bucketName = identifier;
-        String key = path.substring(path.lastIndexOf('/'));
+        String key = path.substring(path.lastIndexOf('/')+1);
         int keyPtIdx = key.lastIndexOf('.');
         key = key.substring(0, keyPtIdx)+ "-" + System.currentTimeMillis() + key.substring(keyPtIdx);
+        System.out.println("S3 upload file key is: "+key);
         PutObjectRequest objectRequest = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(key)
                 .build();
         try{
-            FileInputStream fileInputStream = new FileInputStream(new File(path));
-            byte[] bytesToWrite = fileInputStream.readAllBytes();
+            File file = new File(path);
+            FileInputStream fileInputStream = new FileInputStream(file);
+            byte[] bytesToWrite = Files.readAllBytes(file.toPath());
             ByteArrayInputStream inputStream = new ByteArrayInputStream(bytesToWrite);
             s3Client.putObject(objectRequest, RequestBody.fromInputStream(inputStream, bytesToWrite.length));
             System.out.println("Upload complete");
         }catch(IOException e){
             System.out.println(e);
+            if(e.getMessage().startsWith("Your socket connection to the server"))
+                return "too long";
+            return "";
         }
         return "s://"+identifier+"/"+key;
     }

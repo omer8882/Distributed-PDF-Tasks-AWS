@@ -16,19 +16,32 @@ import software.amazon.awssdk.services.s3.model.*;
 public class Test {
 
     public static void main(String[] args) throws IOException {
-        //System.out.println(System.getenv());
+
+        //System.out.println(System.getProperty("user.dir"));
         //System.out.println(cmd("https://www.star-k.org/articles/wp-content/uploads/Starbucks_Recommendations_July2019.pdf"));
         //System.out.println(downloadPDF("http://www.africau.edu/images/default/sample.pdf"));
         Ec2Client ec2 = Ec2Client.builder().build();
-        //String newEc2Instance = createInstance(ec2);
-        //startInstance(ec2, newEc2Instance);
+        String newEc2Instance = createInstance(ec2);
+        startInstance(ec2, newEc2Instance);
         //describeInstanceTags(ec2, "i-07a5985dcb365cd14");
         //stopInstance(ec2, "i-07a5985dcb365cd14");
         //describeInstanceTags(ec2);
         //describeInstances(ec2);
         //stopInstance(ec2, "i-07a5985dcb365cd14");
-        terminateInstance(ec2, "i-00d4e2e5a42266dd8");
-        System.out.println("Num of running workers: "+getNumOfRunningWorkers(ec2));
+        //terminateInstance(ec2, "i-00d4e2e5a42266dd8");
+        //System.out.println("Num of running workers: "+getNumOfRunningWorkers(ec2));
+        //deleteLocalFiles("C:\\Users\\Omer\\Omer\\University\\Year 3\\Semester 5\\Distributed\\Assignment1\\sample.pdf", "C:\\Users\\Omer\\Omer\\University\\Year 3\\Semester 5\\Distributed\\Assignment1\\sample.pdf");
+    }
+
+    private static void deleteLocalFiles(String localPath, String outputPath) {
+        File f = new File(localPath);
+        if(f.delete()) {
+            System.out.println("Deleted local pdf file.");
+        }
+        f = new File(outputPath);
+        if(f.delete()) {
+            System.out.println("Deleted local converted file.");
+        }
     }
 
     private static String cmd(String url) {
@@ -59,59 +72,55 @@ public class Test {
     }
 
     private static String downloadPDF(String url) {
-        String wgetCmdLine = "wget " + url;
+        ProcessBuilder processBuilder = new ProcessBuilder();
+        String wgetCmdLine = "wget + " + url;
         String localPath = "";
-        try {
-            Process process;
-            // Windows option just for testing
-            if (System.getProperty("os.name").startsWith("Windows")) {
-                System.out.println("OS is Windows...");
-                process = Runtime.getRuntime().exec("cmd /c " + wgetCmdLine);
-            } else {
-                process = Runtime.getRuntime().exec(wgetCmdLine);
-            }
-            StringBuilder output = new StringBuilder();
+        // Windows option just for testing
+        if (System.getProperty("os.name").startsWith("Windows")) {
+            processBuilder.command("cmd.exe", "/c", wgetCmdLine);
+        } else {
+            processBuilder.command("bash", "-c", wgetCmdLine);
+        } try {
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();//todo if cannot download return error to result sqs
+            //To read the output list
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
+            boolean downloaded=false;
             while ((line = reader.readLine()) != null) {
-                output.append(line + "\n");
+                System.out.println(line);
+                if(line.startsWith("Downloaded: 1")) downloaded = true;
             }
-            int exitVal = process.waitFor();
-            if (exitVal == 0) {
-                System.out.println("Success!");
-                System.out.println(output);
-                System.exit(0);
-            } else {
-                System.out.println("Abnormal Error... " + exitVal);
-            }
+            int exitCode = process.waitFor();
+            localPath = System.getProperty("user.dir") + url.substring(url.lastIndexOf('/'));
+            if(!downloaded) return "ERROR";
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
+            return "ERROR";
         }
         return localPath;
     }
 
     private static String createInstance(Ec2Client ec2) {
-        String amiID = "ami-04902260ca3d33422";
+        String amiID = "ami-00e95a9222311e8ed";
         // ami-04ad2567c9e3d7893 (T1_MICRO) without java
         // ami-00e95a9222311e8ed (T2_MICRO) with java - works but version 52.0
         //ami-061fe2315dce4d761
         // ami-04902260ca3d33422 - amazon linux - WORKS!!!! (T2_MICRO) without java
         String userDataString = "#!/bin/bash\n" +
                 "set -x\n" + "echo Hello, World!1\n" +
-                "sudo amazon-linux-extras install java-openjdk11\n" +
-                "export AWS_ACCESS_KEY_ID=ASIAQYDTG66XIRC7SQDD\n" +
-                "export AWS_SECRET_ACCESS_KEY=NlmZgI9B9/+T1r4LS0qfNokg6HpQtNjI721czPxA\n" +
-                "export AWS_SESSION_TOKEN=FwoGZXIvYXdzEFAaDH5DenXY9kOZOL+MEyLIAYTe2peYn0EgVKedKuhPXZFN3LYPlEn4ap5mKG7aAnJ8PhJmP8gjuqZfWXCHiNUkeGfnvnHNPOoqjkGsn/rHSBDm7o3RX05F3+IzB35xgeo9bzJdAWuWU2Iba2mnUkz9dhaTJ3QWU2buvQKmhG//YtztoWwjR+bbMDqMmQypgQcUsU7wkUwg1T+/xRqUZXNNC+ZuE2VuAd0uuueWEnylCIwDAn5gxK3+XJZ9cHjWpiTM6I0d+Jwus9ZzXP6hc+fA4FmODHgQVV+MKNuUno0GMi1H3MuLFD9X9yyhak2KMIPIqCSdxDFuIyRfJ/pJCHCXn1+mvf62uLfb2cVc9dE=\n" +
-                "export AWS_DEFAULT_REGION=us-east-1\n" +
-                "aws s3 cp s3://bucket1637048833333/Main.jar Main.jar\n" +
-                "java -jar Main.jar";
+                //"sudo amazon-linux-extras install java-openjdk11\n" +
+                "aws s3 cp s3://bucket1637048833333/Worker-8.jar Worker-8.jar\n" +
+                "java -jar Worker-8.jar";
         String userData = Base64.getEncoder().encodeToString((userDataString).getBytes());
+        IamInstanceProfileSpecification role = IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build();
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
                 .imageId(amiID)
                 .instanceType(InstanceType.T2_MICRO)
                 .maxCount(1)
                 .minCount(1)
                 .userData(userData)
+                .iamInstanceProfile(role)
                 .build();
 
         RunInstancesResponse response = ec2.runInstances(runRequest);
@@ -254,7 +263,7 @@ public class Test {
         System.out.println("Connection closed");
         System.out.println("Exiting...");
     }
-
+/*
     public static void createNewBucket(S3Client s3Client, String bucketName, Region region) {
         try {
             s3Client.createBucket(CreateBucketRequest
@@ -274,7 +283,7 @@ public class Test {
             System.err.println(e.awsErrorDetails().errorMessage());
             System.exit(1);
         }
-    }
+    }*/
 
     public static void addObject(S3Client s3Client, String bucketName, Region region, String key) {
         PutObjectRequest objectRequest = PutObjectRequest.builder()

@@ -43,7 +43,6 @@ public class Manager {
         int i = 0;
         while (!terminateReceived) {
             msg = localAppInputSqs.tryReadFromSQS();
-//            localAppInputSqs.deleteMessage(msg); // todo relocate
             if (msg == null) {
                 try {
                     Thread.sleep(1000);
@@ -109,7 +108,8 @@ public class Manager {
             System.out.println(e);
         }
 
-        int m = (int) Math.min(Math.ceil(1.0 * workerItemsCount / n), 15);
+        //int m = (int) Math.min(Math.ceil(1.0 * workerItemsCount / n), 15);
+        int m = 3; //TODO: remove that
         synchronized (lock) {
             newNumOfWorkers = Math.max(m, newNumOfWorkers);
         }
@@ -121,18 +121,19 @@ public class Manager {
             // aggregate result
             resultString += getWorkerCompleteMessage(workerResultMsg.body()) + "\n";
         }
-        String fileName = "result.txt";
+        String fileName = System.getProperty("user.dir")+"\\result.txt";
         try (PrintWriter out = new PrintWriter(fileName)) {
             out.println(resultString);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-        //        upload result to s3
+        // upload result to s3
         String url = s3.upload(fileName);
-        //      write the path to the results to local app sqs
+        // write the path to the results to local app sqs
         Sqs localAppResultSqs = new Sqs(splited[2]); // need to trim the message
         localAppResultSqs.write(url, "");
-        localAppInputSqs.deleteMessage(msg); // relocated
+        localAppInputSqs.deleteMessage(msg);
+        workerResultsSqs.delete();
     }
 
     private void createWorkers(Object lock) {
@@ -161,7 +162,7 @@ public class Manager {
         int count = 0, running = 0;
         for (Reservation reservation : response.reservations()) {
             for (Instance instance : reservation.instances()) {
-                System.out.println("Worker " + (++count) + " is " + instance.state().name());
+                //System.out.println("Worker " + (++count) + " is " + instance.state().name());
                 if (instance.state().name() == InstanceStateName.RUNNING || instance.state().name() == InstanceStateName.PENDING)
                     running++;
             }
@@ -180,19 +181,17 @@ public class Manager {
         String userDataString = "#!/bin/bash\n" +
                 "set -x\n" + "echo Hello, World!1\n" +
                 "sudo amazon-linux-extras install java-openjdk11\n" +
-                "export AWS_ACCESS_KEY_ID=ASIAT5QD65XO7ZOCSGBK\n" +
-                "export AWS_SECRET_ACCESS_KEY=gPZysNQTEq59SGwqnPJ8p2jzt6rmi4RLjuEI+M4V\n" +
-                "export AWS_SESSION_TOKEN=FwoGZXIvYXdzEJr//////////wEaDMzmCjoa417GPoTfriLGAad6Npn1x+T6gnKe51Dw5XXbU4m3e/WoTL3l/RhJOtW8I2l7KeMSKPK6fhh6RFXrJs2qesCJf/BR1tC+1hgiioPKyqx7hRWzp/TDXMuMURHG3Vt6fRMt18muGgGHmHXeAqaDSDjD6gtET+OQmvQUP3ivlrlvy9cem0S5OjtXTj514231VKrEkl3lsIbLCRqJ/bDyiDzBIa0dKFHlm8JE4AcEFgTqiPp7Gg7QCKLv47sCf3cP4tfIUCybegBQ1gKzlso5MKpX4yjYt66NBjItm/Iq+kI9z7h2KASEm9qi9JxL2XEVPcjLl2vFjGAOqXAPPCiec+0fYVYmWqc5\n" +
-                "export AWS_DEFAULT_REGION=us-east-1\n" +
-                "aws s3 cp s3://mybucket920463236/Main.jar Main.jar\n" +
-                "java -jar Main.jar";
+                "aws s3 cp s3://bucket1637048833333/Worker.jar Worker.jar\n" +
+                "java -jar Worker.jar";
         String userData = Base64.getEncoder().encodeToString((userDataString).getBytes());
+        IamInstanceProfileSpecification role = IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build();
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
                 .imageId(amiID)
                 .instanceType(InstanceType.T2_MICRO)
                 .maxCount(1)
                 .minCount(1)
                 .userData(userData)
+                .iamInstanceProfile(role)
                 .build();
 
         RunInstancesResponse response = ec2Client.runInstances(runRequest);
@@ -273,7 +272,7 @@ public class Manager {
             String operation = msg.getOperation() == PDFConverter.ToImage ? "ToImage" :
                     msg.getOperation() == PDFConverter.ToHTML ? "ToHTML" :
                             msg.getOperation() == PDFConverter.ToText ? "ToText" : "ERROR";
-            summaryLine = msg.getFileURL() + " " + operation + " " + msg.getS3URL();
+            summaryLine = operation + " " + msg.getFileURL() + " " + msg.getS3URL();
         } catch (IOException e) {
             System.out.println("ERROR: Couldn't read workers complete message properly.\n" + e);
             summaryLine = "Error in transference of a message occurred.";

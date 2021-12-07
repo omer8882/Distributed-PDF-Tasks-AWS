@@ -22,7 +22,7 @@ public class LocalApplication {
 //        String resultSqsId = "LocalAppResultSqs" + System.currentTimeMillis() + ".fifo"; todo return to that
         String resultSqsId = "LocalAppResultSqs1638641369719.fifo";
         // String s3Id = "S3Id" + System.currentTimeMillis();
-        String s3Id = "mybucket920463236";
+        String s3Id = "bucket1637048833333";
         resultSqs = new Sqs(resultSqsId);
         s3 = new S3(s3Id);
 //todo 

@@ -1,7 +1,6 @@
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.sqs.model.Message;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -11,10 +10,10 @@ public class Worker {
 
     static PDFConverter converter = new PDFConverter();
     static Sqs incomingSqs;
-    static S3 s3 = new S3("mybucket920463236");
+    static S3 s3 = new S3("bucket1637048833333");
 
     public static void main(String[] args) throws IOException {
-//        String sqsId = args[1]; // todo return to that
+        System.out.println("Worker started");
         String sqsId = "workerSqs1638641462773.fifo";
         incomingSqs = new Sqs(sqsId);
         run();
@@ -29,13 +28,21 @@ public class Worker {
                 message = convertMsg(msgObject);
                 if(message==null) throw new IOException("Message isn't formatted right");
                 localPath = downloadPDF(message.getFileURL());
+                System.out.println("Local Path: "+localPath);
                 outputPath = converter.convert(message.getOperation(), localPath);
-                String s3URL = s3.upload(outputPath);
+                System.out.println("Output path: "+outputPath);
+                String s3URL="";
+                for(int i=0; i<3; i++){ //Max 3 tries for upload failure
+                    s3URL = s3.upload(outputPath);
+                    if(s3URL!="" | !s3URL.equals("too long"))
+                        break;
+                    if(i==2) throw new IOException("Error: Failed to upload result to S3.");
+                }
                 sendSQSCompleteMessage(message, s3URL);
             } catch (IOException e) {
                 System.out.println("Error: Failed to complete task.\n"+e);
                 if(message == null) continue;
-                sendSQSFailedMessage(message);
+                sendSQSFailedMessage(message, e.getMessage());
             } finally {
                 incomingSqs.deleteMessage(msgObject);
                 deleteLocalFiles(localPath, outputPath);
@@ -43,13 +50,16 @@ public class Worker {
         }
     }
 
-    private static WorkerRequestMsg convertMsg(Message message) {
+    private static WorkerRequestMsg convertMsg(Message message){
         ObjectMapper mapper = new ObjectMapper();
         WorkerRequestMsg msg = null;
         try {
             msg = mapper.readValue(message.body(), WorkerRequestMsg.class);
         } catch (JsonProcessingException e) {
             System.out.println("Failed to convert message: "+e);
+            return null;
+        } catch (IOException e) {
+            e.printStackTrace();
             return null;
         }
         return msg;
@@ -78,7 +88,7 @@ public class Worker {
                 System.out.println(line);
                 if(line.startsWith("Downloaded: 1")) downloaded = true;
             }
-            localPath = System.getProperty("user.dir") + url.substring(url.lastIndexOf('/'));
+            localPath = System.getProperty("user.dir") + url.substring(url.lastIndexOf('/')+1);
             if(!downloaded) throw new IOException("Couldn't download PDF file. Aborting task.");
         return localPath;
     }
@@ -96,8 +106,8 @@ public class Worker {
         }
     }
 
-    private static void sendSQSFailedMessage(WorkerRequestMsg request) {
-        WorkerCompleteMsg msgObject = new WorkerCompleteMsg(request.getOperation(), request.getFileURL(), "ERROR: Couldn't Complete task.");
+    private static void sendSQSFailedMessage(WorkerRequestMsg request, String errMsg) {
+        WorkerCompleteMsg msgObject = new WorkerCompleteMsg(request.getOperation(), request.getFileURL(), errMsg);
         ObjectMapper mapper = new ObjectMapper();
         try {
             String msgString = mapper.writeValueAsString(msgObject);
