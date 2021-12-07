@@ -57,8 +57,10 @@ public class Worker {
             msg = mapper.readValue(message.body(), WorkerRequestMsg.class);
         } catch (JsonProcessingException e) {
             System.out.println("Failed to convert message: "+e);
+            e.printStackTrace();
             return null;
         } catch (IOException e) {
+            System.out.println("Failed to convert message: "+e);
             e.printStackTrace();
             return null;
         }

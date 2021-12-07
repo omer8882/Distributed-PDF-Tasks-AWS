@@ -58,6 +58,6 @@ public class S3 {
                 return "too long";
             return "";
         }
-        return "s://"+identifier+"/"+key;
+        return "s3://"+identifier+"/"+key;
     }
 }
