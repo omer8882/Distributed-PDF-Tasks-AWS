@@ -9,9 +9,9 @@ This project was written as part of the Distributed Systems course in Ben Gurion
 
 ## Table of contents
 * [Description](#Description)
-    * [Local Application](#1.-Local-Application)
-    * [Manager](#2.-Manager)
-    * [Workers](#3.-Workers)
+    * [Local Application](#1-Local-Application)
+    * [Manager](#2-Manager)
+    * [Workers](#3-Workers)
 * [Running the Application](#Running-the-Application)
     * [Setup](#Setup)
     * [Excecuting Local Application](#Excecuting-Local-Application)
@@ -96,12 +96,11 @@ After packaging the Manager and Worker jars correctly, you will upload them to y
 ```
 java -jar LocalApplication.jar [input file] [output file] [num of files per worker] [terminate]
 ```
-* where:
-    * LocalApplication.jar is the name of the jar file containing the code of LocalApplication.
-    * inputFileName is the name of the existing input file.
-    * outputFileName is the name of the desired output file.
-    * n is the workers’ files ratio (how many PDF files per worker).
-    * terminate indicates that the application should terminate the manager at the end.
+* LocalApplication.jar is the name of the jar file containing the code of LocalApplication.
+* inputFileName is the name of the existing input file.
+* outputFileName is the name of the desired output file.
+* n is the workers’ files ratio (how many PDF files per worker).
+* terminate indicates that the application should terminate the manager at the end.
 
 Note that you can run multiple local applications at once, but once there is an active Manager on termination, new Local Apps will not be dealt with.
 
@@ -131,7 +130,7 @@ The project uses the following dependencies:
 
 As a running example, a couple of test file cases are attached to the project in the folder "Test Files", as well as their outputs.
 
-### Notes
+#### Notes
 * The tests used `n = 10` as the number of files per workers.
 * Within the manager we set the limit of maximum workers active simultaniously to be 8 (because the AWS service shuts instances unprompted if there are more than that, when using a student account).
 * It took approximately 30 minutes for the "input-sample-1.txt" file to complete.
