@@ -1,7 +1,10 @@
 # AWS Task Distribution
 
 This project uses Amazon Web Services to distribute workload of mass PDF convertions to other formats.
-The application is composed of a local application and instances running on the Amazon cloud. The local application will get a text file as an input containing a list of URLs of PDF files alongside an operation to perform on them. Then, instances (called workers) will be launched in AWS. Each worker will download PDF files, perform the requested operation, and display the result of the operation on a webpage
+
+### Introduction
+The application is composed of a local application (running on the client's computer) and instances running on the AWS EC2. The local application will get a text file as an input containing a list of URLs of PDF files alongside an operation to perform on them. Then, instances (called workers) will be launched in AWS. Each worker will download PDF files, perform the requested operation, and display the result of the operation on a webpage.
+
 This project was written as part of the Distributed Systems course in Ben Gurion University semester 1/2022 by Omer Dahary and Niv Dan.
 
 ## Table of contents
@@ -13,13 +16,13 @@ This project was written as part of the Distributed Systems course in Ben Gurion
     * [Setup](#Setup)
     * [Excecuting Local Application](#Excecuting-Local-Application)
 * [Impelementation notes](#Notes-on-Implementation)
-* [Tests](#Tests)
+* [Test Examples](#Test-Examples)
 
 ## Description
 
 This repository contains the code for the 3 elements that compose the entire system: Local Application, Manager and Worker(s).
 The elements communicate with each other using SQS and S3 sevices provided by AWS.
-All messages sent between the elements is done by useing SQS queues. And all files are tranfered through uploading and/or downloading via S3.
+All messages sent between the elements is done by useing SQS queues, while all files are tranfered through uploading and/or downloading via S3.
 
 ### 1. Local Application
 
@@ -44,13 +47,13 @@ then output line for this file will be:
 <operation>: <input> file <a short description of the exception>.
 ```
 
-The Local App checks if there is an EC2 instance of a Manager running, if not it creates one. Then uploads the input file to S3 along with a message request.
+The Local App checks if there is an EC2 instance of a Manager running, if not it creates one. Then uploads the input file to S3 and sends a message request through SQS to the manager.
 Then it waits for a comeplete message from the Manager along with the required result.
 
 ### 2. Manager
-The manager process resides as a EC2 instance. At all times there is only one manager instance that handles the local application requests. It has the ability to handle multiple Local Application requests simultaneously. The Manager checks a special SQS queue for messages from local
-applications. Once it receives a message it:
-* If the message is that of a new task it:
+The manager process resides as EC2 instance. At all times there is no more than one manager instance that handles the local application requests. It has the ability to handle multiple Local Application requests simultaneously. The Manager checks a special SQS queue for messages from local
+applications. Once it receives a message it operates accordingly:
+* If the message is that of a new task:
 	* Downloads the input file from S3.
 	* Creates an SQS message for each URL in the input file together with the operation that should be performed on it.
 	
@@ -63,12 +66,12 @@ Note that while the manager creates a node for every n messages, it does not del
 
 ### 3. Workers
 A worker process resides on an EC2 instance. Its life cycle is as follows (repeatedly):
-* Get a message from Workers SQS queue.
-* Download the PDF file indicated in the message.
-* Perform the operation requested on the file.
-* Upload the resulted output file to S3.
-* Send a message in an SQS queue indicating the original URL of the PDF, the S3 url of the new image file, and the operation that was performed.
-* remove the processed message from the SQS queue.
+* Gets a message from Workers SQS queue.
+* Downloads the PDF file indicated in the message.
+* Performs the operation requested on the file.
+* Uploads the resulted output file to S3.
+* Sends a message in an SQS queue indicating the original URL of the PDF, the S3 url of the new image file, and the operation that was performed.
+* Removes the processed message from the SQS queue.
 
 If an exception occurs, then the worker recovers from it, sends a message to the manager of the input message that caused the exception together with a short description of the exception, and continues working on the next message.
 If a worker stops working unexpectedly before finishing its work on a message, then some
@@ -78,8 +81,11 @@ other worker should be able to handle that message.
 ### Setup
 First, you need to compile and package the 3 element of the project:
 * To compile and package the LocalApplication jar file use the command: 
+```
 mvn assembly:assembly -DdescriptorId=jar-with-dependencies
+```
 * To compile and package the Manager and Worker, use the same command while making sure beforehand that their respective Classes will be running in executing the jars (usually done with in the POM file).
+
 Because S3 bucket names are unique across the entine service, if you desire to run the project yourself, you should update the communal bucket names in the code for your specific usage.
 After packaging the Manager and Worker jars correctly, you will upload them to your main bucket.
 
@@ -121,7 +127,7 @@ The project uses the following dependencies:
     * maven-jar-plugin
     * maven-compiler-plugin
 
-## Tests
+## Test Examples
 
 As a running example, a couple of test file cases are attached to the project in the folder "Test Files", as well as their outputs.
 
