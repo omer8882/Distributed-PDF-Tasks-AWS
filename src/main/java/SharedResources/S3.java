@@ -1,6 +1,6 @@
-import com.fasterxml.jackson.databind.ObjectMapper;
+package SharedResources;
+
 import software.amazon.awssdk.core.ResponseInputStream;
-import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -37,7 +37,12 @@ public class S3 {
 
     public String upload(String path){
         String bucketName = identifier;
-        String key = path.substring(path.lastIndexOf('/')+1);
+        String key = "";
+        if (System.getProperty("os.name").startsWith("Windows")) {
+            key = path.substring(path.lastIndexOf('\\')+1);
+        } else {
+            key = path.substring(path.lastIndexOf('/')+1);
+        }
         int keyPtIdx = key.lastIndexOf('.');
         key = key.substring(0, keyPtIdx)+ "-" + System.currentTimeMillis() + key.substring(keyPtIdx);
         System.out.println("S3 upload file key is: "+key);
@@ -47,7 +52,6 @@ public class S3 {
                 .build();
         try{
             File file = new File(path);
-            FileInputStream fileInputStream = new FileInputStream(file);
             byte[] bytesToWrite = Files.readAllBytes(file.toPath());
             ByteArrayInputStream inputStream = new ByteArrayInputStream(bytesToWrite);
             s3Client.putObject(objectRequest, RequestBody.fromInputStream(inputStream, bytesToWrite.length));
@@ -59,5 +63,9 @@ public class S3 {
             return "";
         }
         return "s3://"+identifier+"/"+key;
+    }
+
+    public String getIdentifier(){
+        return this.identifier;
     }
 }

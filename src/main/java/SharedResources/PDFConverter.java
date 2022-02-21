@@ -1,7 +1,8 @@
+package SharedResources;
+
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
-import org.apache.pdfbox.tools.PDFText2HTML;
 import org.apache.pdfbox.tools.imageio.ImageIOUtil;
 import org.apache.pdfbox.tools.ExtractText;
 
@@ -19,14 +20,18 @@ public class PDFConverter {
         String outputPath = "";
         if (!path.toLowerCase().endsWith(".pdf")){
             System.out.println("Error: File is not PDF!");
-            throw new IOException("File is not PDF.");
+            throw new IOException("Error: File is not PDF.");
         }
-        if ( (convertion & ToImage) == ToImage)
-            outputPath = toImage(path);
-        if ( (convertion & ToHTML) == ToHTML)
-            outputPath = toHTML(path);
-        if ( (convertion & ToText) == ToText)
-            outputPath = toText(path);
+        try {
+            if ((convertion & ToImage) == ToImage)
+                outputPath = toImage(path);
+            if ((convertion & ToHTML) == ToHTML)
+                outputPath = toHTML(path);
+            if ((convertion & ToText) == ToText)
+                outputPath = toText(path);
+        }catch(IOException e){
+            throw new IOException("Error: Failed to convert pdf file");
+        }
         return outputPath;
     }
 
@@ -41,7 +46,6 @@ public class PDFConverter {
         System.out.println("Converted PDF to PNG file.");
         return output;
     }
-    // Read more: https://stackoverflow.com/questions/23326562/convert-pdf-files-to-images-with-pdfbox
 
     private String toText(String pdfAbsolutePath) throws IOException {
         String textFileOutput = pdfAbsolutePath.substring(0, pdfAbsolutePath.length()-3) + "txt";
@@ -58,8 +62,5 @@ public class PDFConverter {
         System.out.println("Converted PDF to HTML file.");
         return htmlFileOutput;
     }
-    // Other options: https://stackoverflow.com/questions/27268879/convert-pdf-to-html-page-wise-using-pdfbox-library
-    //               https://dzone.com/articles/converting-pdf-html-using
-    //               https://www.baeldung.com/pdf-conversions-java
 
 }

@@ -1,18 +1,19 @@
-public class WorkerCompleteMsg {
+package Worker;
+
+public class WorkerRequestMsg {
     private short operation;
     private String fileURL;
-    private String s3URL;
+    private String resultSqsId;
 
-    public WorkerCompleteMsg(short operation, String fileURL, String s3URL) {
+    public WorkerRequestMsg(short operation, String fileURL, String resultSqsId) {
         this.operation = operation;
         this.fileURL = fileURL;
-        this.s3URL = s3URL;
+        this.resultSqsId = resultSqsId;
     }
-
-    public WorkerCompleteMsg() {
+    public WorkerRequestMsg() {
         this.operation = 0;
         this.fileURL = "";
-        this.s3URL = "";
+        this.resultSqsId = "";
     }
 
     public short getOperation() { return operation; }
@@ -29,11 +30,11 @@ public class WorkerCompleteMsg {
         this.fileURL = fileURL;
     }
 
-    public String getS3URL() {
-        return s3URL;
+    public String getResultSqsId() {
+        return resultSqsId;
     }
 
-    public void setS3URL(String s3URL) {
-        this.s3URL = s3URL;
+    public void setResultSqsId(String resultSqsId) {
+        this.resultSqsId = resultSqsId;
     }
 }

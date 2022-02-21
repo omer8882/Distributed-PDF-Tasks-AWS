@@ -1,5 +1,6 @@
+package SharedResources;
+
 import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.*;
 
@@ -15,31 +16,33 @@ public class Sqs {
         Region region = Region.US_EAST_1;
         this.sqsClient = SqsClient.builder().region(region).build();
 
-        String prefix = identifier;
-
+        // Checks if queue with this prefix already exists, if not, creates new queue
         try {
-            ListQueuesRequest listQueuesRequest = ListQueuesRequest.builder().queueNamePrefix(prefix).build();
-            ListQueuesResponse listQueuesResponse = sqsClient.listQueues(listQueuesRequest);
-            boolean found = false;
-            for (String url : listQueuesResponse.queueUrls()) {
-                this.queueURL = url;
-                found = true;
-                System.out.println(url);
+            if (!queueExists(identifier)) {
+                this.queueURL = createQueue(identifier);
             }
-            if (!found) {
-                this.queueURL = createQueue(sqsClient, identifier);
-            }
-
         } catch (SqsException e) {
             System.err.println(e.awsErrorDetails().errorMessage());
             System.exit(1);
         }
     }
 
-    public static String createQueue(SqsClient sqsClient, String queueName) {
+    // Return true if queue with this prefix exists, else returns false
+    private boolean queueExists(String prefix){
+        ListQueuesRequest listQueuesRequest = ListQueuesRequest.builder().queueNamePrefix(prefix).build();
+        ListQueuesResponse listQueuesResponse = sqsClient.listQueues(listQueuesRequest);
+        boolean found = false;
+        for (String url : listQueuesResponse.queueUrls()) {
+            this.queueURL = url;
+            found = true;
+            System.out.println(url);
+        }
+        return found;
+    }
 
+    private String createQueue(String queueName) {
         try {
-            System.out.println("\nCreate Queue");
+            System.out.println("Creating Queue " + queueName);
             Map<QueueAttributeName, String> attributes = new HashMap<>();
             attributes.put(QueueAttributeName.FIFO_QUEUE, Boolean.TRUE.toString());
 
@@ -49,8 +52,6 @@ public class Sqs {
                     .build();
 
             sqsClient.createQueue(createQueueRequest);
-
-            System.out.println("\nGet queue url");
 
             GetQueueUrlResponse getQueueUrlResponse =
                     sqsClient.getQueueUrl(GetQueueUrlRequest.builder().queueName(queueName).build());
@@ -63,6 +64,7 @@ public class Sqs {
         return "";
     }
 
+    // Blocking until there is a new message to return from queue
     public Message readBlocking() {
         Message msg;
         do {
@@ -74,7 +76,6 @@ public class Sqs {
     }
 
     public void write(String msg, String groupId) {
-        System.out.println("Writing to sqs: " + msg);
         if (groupId == "") {
             groupId = String.valueOf(System.currentTimeMillis());
         }
@@ -86,12 +87,17 @@ public class Sqs {
                 .build());
     }
 
+    /*
+    * Returns new message from queue if exists
+    * else returns null
+    * */
     public Message tryReadFromSQS() {
         try {
             ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
                     .queueUrl(queueURL)
                     .maxNumberOfMessages(1)
-                    .visibilityTimeout(15 * 60)
+                    .visibilityTimeout(75 * 60)
+                    .waitTimeSeconds(3)
                     .build();
             List<Message> messages = sqsClient.receiveMessage(receiveMessageRequest).messages();
             if (messages == null || messages.size() == 0) {
@@ -120,6 +126,7 @@ public class Sqs {
         }
     }
 
+    // Deletes this queue
     public void delete() {
         try {
             DeleteQueueRequest deleteQueueRequest = DeleteQueueRequest.builder()
@@ -133,21 +140,4 @@ public class Sqs {
             System.exit(1);
         }
     }
-
-//        public int size () {
-//            try {
-//                ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
-//                        .queueUrl(queueURL)
-//                        .build();
-//                List<Message> messages = sqsClient.receiveMessage(receiveMessageRequest).messages();
-//                if (messages == null) {
-//                    return 0;
-//                }
-//                return messages.size();
-//            } catch (SqsException e) {
-//                System.err.println(e.awsErrorDetails().errorMessage());
-//                System.exit(1);
-//            }
-//            return -1;
-//        }
 }

@@ -1,4 +1,8 @@
-import com.fasterxml.jackson.core.JsonProcessingException;
+package Worker;
+
+import SharedResources.PDFConverter;
+import SharedResources.S3;
+import SharedResources.Sqs;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.sqs.model.Message;
 import java.io.BufferedReader;
@@ -10,33 +14,36 @@ public class Worker {
 
     static PDFConverter converter = new PDFConverter();
     static Sqs incomingSqs;
-    static S3 s3 = new S3("bucket1637048833333");
+    static S3 s3 = new S3("*** S3 Identifier ***");
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args){
         System.out.println("Worker started");
-        String sqsId = "workerSqs1638641462773.fifo";
+        String sqsId = "*** workerSqs ***";
         incomingSqs = new Sqs(sqsId);
         run();
     }
 
-    public static void run() {
+    /**
+     * Loops until terminated by Manager
+     * Each loops handles a new worker request
+     */
+    private static void run() {
         while (true) {
             String localPath="", outputPath="";
             WorkerRequestMsg message = null;
             Message msgObject = getMessage();
             try {
                 message = convertMsg(msgObject);
-                if(message==null) throw new IOException("Message isn't formatted right");
+                if (message==null) throw new IOException("Error: Message isn't formatted right");
                 localPath = downloadPDF(message.getFileURL());
-                System.out.println("Local Path: "+localPath);
                 outputPath = converter.convert(message.getOperation(), localPath);
-                System.out.println("Output path: "+outputPath);
-                String s3URL="";
-                for(int i=0; i<3; i++){ //Max 3 tries for upload failure
+                String s3URL = "";
+                // Max 3 tries for upload failure
+                for(int i = 0; true; i++){
                     s3URL = s3.upload(outputPath);
-                    if(s3URL!="" | !s3URL.equals("too long"))
+                    if(!s3URL.equals("") && !s3URL.equals("too long"))
                         break;
-                    if(i==2) throw new IOException("Error: Failed to upload result to S3.");
+                    if(i==2) throw new IOException("Error: Failed to upload result to SharedResources.S3.");
                 }
                 sendSQSCompleteMessage(message, s3URL);
             } catch (IOException e) {
@@ -44,6 +51,7 @@ public class Worker {
                 if(message == null) continue;
                 sendSQSFailedMessage(message, e.getMessage());
             } finally {
+                // Deletes message when finished handling it
                 incomingSqs.deleteMessage(msgObject);
                 deleteLocalFiles(localPath, outputPath);
             }
@@ -55,10 +63,6 @@ public class Worker {
         WorkerRequestMsg msg = null;
         try {
             msg = mapper.readValue(message.body(), WorkerRequestMsg.class);
-        } catch (JsonProcessingException e) {
-            System.out.println("Failed to convert message: "+e);
-            e.printStackTrace();
-            return null;
         } catch (IOException e) {
             System.out.println("Failed to convert message: "+e);
             e.printStackTrace();
@@ -73,9 +77,8 @@ public class Worker {
 
     private static String downloadPDF(String url) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder();
-        String wgetCmdLine = "wget + " + url;
+        String wgetCmdLine = "wget " + url;
         String localPath = "";
-        // Windows option just for testing
         if (System.getProperty("os.name").startsWith("Windows")) {
             processBuilder.command("cmd.exe", "/c", wgetCmdLine);
         } else {
@@ -84,14 +87,15 @@ public class Worker {
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
             boolean downloaded=false;
+
+            //Checks if file was downloaded successfully
+            String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println(line);
-                if(line.startsWith("Downloaded: 1")) downloaded = true;
+                if(line.contains("saved")) downloaded = true;
             }
             localPath = System.getProperty("user.dir") + url.substring(url.lastIndexOf('/')+1);
-            if(!downloaded) throw new IOException("Couldn't download PDF file. Aborting task.");
+            if(!downloaded) throw new IOException("Couldn't download PDF file.");
         return localPath;
     }
 

@@ -3,6 +3,8 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
+import SharedResources.PDFConverter;
+import Worker.WorkerRequestMsg;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -16,13 +18,13 @@ import software.amazon.awssdk.services.s3.model.*;
 public class Test {
 
     public static void main(String[] args) throws IOException {
-
-        //System.out.println(System.getProperty("user.dir"));
+        System.out.println(System.getProperty("user.dir"));
+        listAllFilesS3(S3Client.builder().build());
         //System.out.println(cmd("https://www.star-k.org/articles/wp-content/uploads/Starbucks_Recommendations_July2019.pdf"));
         //System.out.println(downloadPDF("http://www.africau.edu/images/default/sample.pdf"));
-        Ec2Client ec2 = Ec2Client.builder().build();
-        String newEc2Instance = createInstance(ec2);
-        startInstance(ec2, newEc2Instance);
+//        Ec2Client ec2 = Ec2Client.builder().build();
+//        String newEc2Instance = createInstance(ec2);
+//        startInstance(ec2, newEc2Instance);
         //describeInstanceTags(ec2, "i-07a5985dcb365cd14");
         //stopInstance(ec2, "i-07a5985dcb365cd14");
         //describeInstanceTags(ec2);
@@ -31,6 +33,40 @@ public class Test {
         //terminateInstance(ec2, "i-00d4e2e5a42266dd8");
         //System.out.println("Num of running workers: "+getNumOfRunningWorkers(ec2));
         //deleteLocalFiles("C:\\Users\\Omer\\Omer\\University\\Year 3\\Semester 5\\Distributed\\Assignment1\\sample.pdf", "C:\\Users\\Omer\\Omer\\University\\Year 3\\Semester 5\\Distributed\\Assignment1\\sample.pdf");
+        //downloadngram();
+    }
+
+    private static void listAllFilesS3(S3Client s3Client){
+        //"s3://datasets.elasticmapreduce/ngrams/books/20090715/heb-all/1gram/"
+        ListObjectsV2Request req = ListObjectsV2Request.builder().bucket("datasets.elasticmapreduce").prefix("ngrams/books/20090715/heb-all/1gram/").build();
+        ListObjectsV2Response listing = s3Client.listObjectsV2(req);
+        for (S3Object o : listing.contents()) {
+            System.out.println(o.key());
+        }
+    }
+
+    private static void downloadngram() throws IOException {
+        S3Client s3;
+        Region region = Region.US_EAST_1;
+        s3 = S3Client.builder().region(region).build();
+        String keyName = "ngrams/books/20090715/heb-all/1gram/data";
+        String bucket = "datasets.elasticmapreduce";
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(keyName)
+                .build();
+        ResponseInputStream<GetObjectResponse> obj = s3.getObject(getObjectRequest);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(obj));
+        String fileName = System.getProperty("user.dir") + "\\"+"Hebrew-1-gram+";
+
+        String line;
+        try(PrintWriter out = new PrintWriter(fileName)) {
+            int i = 0;
+            while ((line = reader.readLine()) != null) {
+                System.out.println("Line "+(i++)+": "+line);
+                out.println(line);
+            }
+        }
     }
 
     private static void deleteLocalFiles(String localPath, String outputPath) {
@@ -110,8 +146,8 @@ public class Test {
         String userDataString = "#!/bin/bash\n" +
                 "set -x\n" + "echo Hello, World!1\n" +
                 //"sudo amazon-linux-extras install java-openjdk11\n" +
-                "aws s3 cp s3://bucket1637048833333/Worker-8.jar Worker-8.jar\n" +
-                "java -jar Worker-8.jar";
+                "aws s3 cp s3://bucket1637048833333/Worker.Worker-8.jar Worker.Worker-8.jar\n" +
+                "java -jar Worker.Worker-8.jar";
         String userData = Base64.getEncoder().encodeToString((userDataString).getBytes());
         IamInstanceProfileSpecification role = IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build();
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
@@ -191,8 +227,8 @@ public class Test {
 //        DescribeTagsResponse describeTagsResponse = ec2.describeTags(DescribeTagsRequest.builder().build());
 //        List<TagDescription> tags = describeTagsResponse.tags();
 //        for (TagDescription tag : tags) {
-//            if (tag.key().equals("Type") && tag.value().equals("Worker")) {
-//                System.out.println("Found Worker with id "+tag.resourceId());
+//            if (tag.key().equals("Type") && tag.value().equals("Worker.Worker")) {
+//                System.out.println("Found Worker.Worker with id "+tag.resourceId());
                 //Filter filter = Filter.builder().name("resource-id").values(tag.resourceId()).build();
                 Filter filter = Filter.builder().name("tag:Type").values("Worker").build();
                 DescribeInstancesRequest request = DescribeInstancesRequest.builder().filters(filter).build();
@@ -239,7 +275,7 @@ public class Test {
     }
 
 
-    /************************** S3 **********************/
+    /************************** SharedResources.S3 **********************/
 
     private void testS3() throws IOException {
         Region region = Region.US_EAST_1;
@@ -258,7 +294,7 @@ public class Test {
 
         //cleanUp(s3, bucket, key);
 
-        System.out.println("Closing the connection to {S3}");
+        System.out.println("Closing the connection to {SharedResources.S3}");
         s3.close();
         System.out.println("Connection closed");
         System.out.println("Exiting...");
@@ -317,7 +353,7 @@ public class Test {
         BufferedReader reader = new BufferedReader(new InputStreamReader(obj));
 
         String line;
-        System.out.println("File from S3 bucket:");
+        System.out.println("File from SharedResources.S3 bucket:");
         while ((line = reader.readLine()) != null) {
             System.out.println(line);
         }
