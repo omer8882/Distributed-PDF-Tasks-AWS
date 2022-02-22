@@ -3,9 +3,9 @@
 This project uses Amazon Web Services to distribute workload of mass PDF convertions to other formats.
 
 ### Introduction
-The application is composed of a local application (running on the client's computer) and instances running on the AWS EC2. The local application will get a text file as an input containing a list of URLs of PDF files alongside an operation to perform on them. Then, instances (called workers) will be launched in AWS. Each worker will download PDF files, perform the requested operation, and display the result of the operation on a webpage.
+The application is composed of a local application (running on the client's computer) and instances running on AWS EC2. The local application gets a text file as an input containing a list of URLs of PDF files alongside an operation to perform on them. Then, instances (called workers) launch in AWS. Each worker downloads PDF files, perform the requested operation, and displays the result of the operation on a webpage.
 
-This project was written as part of the Distributed Systems course in Ben Gurion University semester 1/2022 by Omer Dahary and Niv Dan.
+This project was written as part of the Distributed System Programming course in Ben Gurion University semester 1/2022 by Omer Dahary and Niv Dan.
 
 ## Table of contents
 * [Description](#Description)
@@ -51,7 +51,7 @@ The Local App checks if there is an EC2 instance of a Manager running, if not it
 Then it waits for a comeplete message from the Manager along with the required result.
 
 ### 2. Manager
-The manager process resides as EC2 instance. At all times there is no more than one manager instance that handles the local application requests. It has the ability to handle multiple Local Application requests simultaneously. The Manager checks a special SQS queue for messages from local
+The manager process resides on an EC2 instance. At all times there is no more than one manager instance that handles the local application requests. It has the ability to handle multiple Local Application requests simultaneously. The Manager checks a special SQS queue for messages from local
 applications. Once it receives a message it operates accordingly:
 * If the message is that of a new task:
 	* Downloads the input file from S3.
