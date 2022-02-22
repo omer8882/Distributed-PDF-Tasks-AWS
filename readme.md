@@ -5,7 +5,7 @@ This project uses Amazon Web Services to distribute workload of mass PDF convert
 ### Introduction
 The application is composed of a local application (running on the client's computer) and instances running on AWS EC2. The local application gets a text file as an input containing a list of URLs of PDF files alongside an operation to perform on them. Then, instances (called workers) launch in AWS. Each worker downloads PDF files, perform the requested operation, and displays the result of the operation on a webpage.
 
-This project was written as part of the Distributed System Programming course in Ben Gurion University semester 1/2022 by Omer Dahary and Niv Dan.
+This project was written as part of the Distributed System Programming course in Ben Gurion University semester 1/2022 by Omer Dahary and Niv Daniel.
 
 ## Table of contents
 * [Description](#Description)
@@ -137,4 +137,4 @@ As a running example, a couple of test file cases are attached to the project in
 
 ## Authors
 
-Omer Dahary and Niv Dan
+Omer Dahary and Niv Daniel
